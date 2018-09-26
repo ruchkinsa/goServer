@@ -1,0 +1,12 @@
+body { background-color: lightgrey; }
+#container {
+    padding: 20px;
+    background-color: lightgray;
+}
+.error { color: red;}
+.text-center { text-align: center; }
+
+.c-blue { color: blue;}
+.c-green { color: green;}
+.c-orange { color: orange; }
+

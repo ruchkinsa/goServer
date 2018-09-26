@@ -1,0 +1,13 @@
+{{define "head"}}<link href="/static/css/main.css" rel="stylesheet" media="screen">{{end}}
+
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "body"}}
+<div class="container " id="container">
+    <div class="row c-green">
+    {{.Body}}
+    </div>
+</div>
+{{end}}
+
+{{define "scripts"}}<script src="/static/js/main.js"></script>{{end}}
