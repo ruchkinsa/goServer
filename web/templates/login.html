@@ -1,0 +1,20 @@
+﻿{{define "title"}}{{.Title}}{{end}}
+{{define "head"}}<link href="/css/main.css" rel="stylesheet" media="screen">{{end}}
+{{define "body"}}
+    <div class="container" id="container">
+        <div class="row">
+            {{.Body}}			
+			<form enctype="application/x-www-form-urlencoded" action="/login" method="post" class="">
+				<div class="">					
+					<input type="text" name="username" id="username" value="" size="20" class="" required="1" placeholder="Login">
+				</div>
+				<div class="">					
+					<input type="password" name="password" id="password" value="" size="20" class="" required="1" placeholder="Password"></div>
+				<div class="center">
+					<input type="submit" name="submit" id="submit" value="Войти" class="">
+				</div>
+			</form>
+        </div>
+    </div>
+{{end}}
+{{define "scripts"}}<script src="/js/main.js"></script>{{end}}

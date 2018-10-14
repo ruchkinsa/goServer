@@ -1,0 +1,16 @@
+﻿{{define "title"}}{{.Title}}{{end}}
+{{define "head"}}	
+	<link href="/css/main.css" rel="stylesheet" media="screen">	
+{{end}}
+{{define "body"}}
+    <div class="container" id="container">
+        <div class="row">
+            {{.Body}}			
+			<ul>
+				<li><a href="/login">Login</a></li>
+				<li class="color-green"><a href="/people">People</a></li>
+			</ul>
+        </div>
+    </div>
+{{end}}
+{{define "scripts"}}<script src="/js/main.js"></script>{{end}}

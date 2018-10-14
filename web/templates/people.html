@@ -1,0 +1,24 @@
+﻿{{define "title"}}{{.Title}}{{end}}
+{{define "head"}}<link href="/css/main.css" rel="stylesheet" media="screen">{{end}}
+{{define "body"}}
+    <div class="container" id="container">
+        <div class="row">
+			<h3>Users</h3>
+			<table BORDER="1">
+            {{range .Users}}
+				<tr>
+					<td>{{ .Id }}</td>
+					<td>{{ .Name }}</td>
+					<td>{{ .Login }}</td>
+					<td>{{ .Password }}</td>
+				</tr>
+			{{else}}
+				<tr>
+					<td COLSPAN=4>Data not found</td>
+				</tr>
+			{{end}}
+			</table>
+        </div>
+    </div>
+{{end}}
+{{define "scripts"}}<script src="/js/main.js"></script>{{end}}

@@ -1,0 +1,11 @@
+﻿{{define "title"}}Error{{end}}
+{{define "head"}}<link href="/css/main.css" rel="stylesheet" media="screen">{{end}}
+{{define "body"}}
+<div class="container" id="container">
+    <div class="text-center color-red">
+        Status: {{.Status}} <br>
+		Error: {{.Error}}
+    </div>
+</div>
+{{end}}
+{{define "scripts"}}<script src="/js/main.js"></script>{{end}}
