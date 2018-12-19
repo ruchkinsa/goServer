@@ -14,6 +14,6 @@ func (m *Model) People() ([]*User, error) {
 	return m.SelectPeople()
 }
 
-func (m *Model) CheckLoginUser(login, password string) ([]*User, error) {
+func (m *Model) CheckLoginUser(login, password string) (*User, error) {
 	return m.LoginUser(login, password)
 }

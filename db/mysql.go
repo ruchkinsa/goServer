@@ -100,12 +100,16 @@ func (p *sqlDb) SelectPeople() ([]*model.User, error) {
 	return people, nil
 }
 
-func (p *sqlDb) LoginUser(login, password string) ([]*model.User, error) {
+func (p *sqlDb) LoginUser(login, password string) (*model.User, error) {
 	people := make([]*model.User, 0)
 	log.Println("func LoginUser")
 	if err := p.sqlLoginUser.Select(&people, login, password); err != nil {
 		log.Println(err)
 		return nil, err
 	}
-	return people, nil
+	log.Println("func LoginUser -> people: ", people)
+	if len(people) == 0 {
+		return nil, nil
+	}
+	return people[0], nil
 }

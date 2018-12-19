@@ -2,7 +2,7 @@ package api
 
 import (
 	"encoding/json"
-	_ "fmt"
+	"fmt"
 	"github.com/go-chi/chi"
 	"html/template"
 	"log"
@@ -11,6 +11,8 @@ import (
 	"path"
 	"time"
 	//"github.com/go-chi/render"
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/go-chi/jwtauth"
 
 	"../model"
 )
@@ -22,8 +24,6 @@ type Config struct {
 	PublicPathTemplates http.FileSystem
 }
 
-var templates = make(map[string]*template.Template)
-
 type page struct {
 	Title string
 	Body  template.HTML //[]byte
@@ -32,34 +32,82 @@ type page struct {
 
 const lenPath = len("/")
 
+var templates = make(map[string]*template.Template)
+
+type ClaimsJWT struct {
+	Name string `json: "name"`
+	jwt.StandardClaims
+}
+
+//https://stackoverflow.com/questions/36236109/go-and-jwt-simple-authentication
+// cookie - https://github.com/Unknwon/build-web-application-with-golang_EN/blob/master/eBook/06.1.md
+/*
+
+c := &http.Cookie{Name: "jwt", Value: str}
+    http.SetCookie(w, c)
+    w.Header().Set("Location", "/foo")
+    w.WriteHeader(http.StatusFound)
+*/
+
+/*
+type StandardClaims struct {
+    Audience  string `json:"aud,omitempty"`	 	имя клиента для которого токен выпущен.
+    ExpiresAt int64  `json:"exp,omitempty"`		срок действия токена.
+    Id        string `json:"jti,omitempty"`		уникальный идентификатор токен (нужен, чтобы нельзя был «выпустить» токен второй раз)
+    IssuedAt  int64  `json:"iat,omitempty"`		время выдачи токена.
+    Issuer    string `json:"iss,omitempty"` 	адрес или имя удостоверяющего центра.
+    NotBefore int64  `json:"nbf,omitempty"`		время, начиная с которого может быть использован (не раньше чем).
+    Subject   string `json:"sub,omitempty"`		идентификатор пользователя. Уникальный в рамках удостоверяющего центра, как минимум.
+}
+
+
+*/
+
+var tokenAuth *jwtauth.JWTAuth
+
+func init() {
+	tokenAuth = jwtauth.New("HS512", []byte("secret"), nil)
+	_, tokenString, _ := tokenAuth.Encode(jwt.MapClaims{"user_id": 123})
+	fmt.Printf("DEBUG: a sample jwt is %s\n\n", tokenString)
+}
+
 func Start(cfg Config, m *model.Model, listener net.Listener) {
 
 	r := chi.NewRouter()
 	// routers:
-	r.Handle("/people", peopleHandler(m))
-	r.Handle("/people/{param}", peopleHandlerParam(m))
-	//r.Handle("/login", authHandler())
-	r.Route("/login", func(r chi.Router) {
-		r.Post("/", authHandler(m)) // POST
-		r.Get("/", loginHandler)    // GET
-	})
-	r.Handle("/", indexHandler(m))
-	// определяем пути к статическим данным
-	r.Handle("/css/*", http.StripPrefix("/css/", http.FileServer(cfg.PublicPathCSS)))
-	r.Handle("/js/*", http.StripPrefix("/js/", http.FileServer(cfg.PublicPathJS)))
-	r.Handle("/templates/*", http.StripPrefix("/templates/", http.FileServer(cfg.PublicPathTemplates)))
-	// назначаем обработчик, если запрошенный url не существует
-	r.NotFound(error404Handler)
+	// routers: protected
+	r.Group(func(r chi.Router) {
+		r.Use(jwtauth.Verifier(tokenAuth)) // Seek, verify and validate JWT tokens
+		r.Use(jwtauth.Authenticator)       // можно переопределить этот метод проверки
 
+		r.Handle("/people", peopleHandler(m))
+	})
+
+	// routers: public
+	r.Group(func(r chi.Router) {
+		r.Handle("/people/{param}", peopleHandlerParam(m))
+		r.Route("/login", func(r chi.Router) {
+			r.Post("/", authHandler(m)) // POST
+			r.Get("/", loginHandler)    // GET
+		})
+		r.Handle("/", indexHandler(m))
+		// ways static data
+		r.Handle("/css/*", http.StripPrefix("/css/", http.FileServer(cfg.PublicPathCSS)))
+		r.Handle("/js/*", http.StripPrefix("/js/", http.FileServer(cfg.PublicPathJS)))
+		r.Handle("/templates/*", http.StripPrefix("/templates/", http.FileServer(cfg.PublicPathTemplates)))
+		// назначаем обработчик, если запрошенный url не существует
+		r.NotFound(error404Handler)
+	})
+	// templates: base
 	templates["index"] = template.Must(template.ParseFiles(path.Join(cfg.PublicPath, "templates", "layout.html"), path.Join(cfg.PublicPath, "templates", "index.html")))
 	templates["error"] = template.Must(template.ParseFiles(path.Join("web", "templates", "layout.html"), path.Join("web", "templates", "error.html")))
-
+	// server: settings
 	server := &http.Server{
 		Handler:        r,
 		ReadTimeout:    60 * time.Second,
 		WriteTimeout:   60 * time.Second,
 		MaxHeaderBytes: 1 << 16}
-
+	// server: run
 	go server.Serve(listener)
 }
 
@@ -90,14 +138,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, r, "login", &p)
 }
 
-/*
-func authHandler(w http.ResponseWriter, r *http.Request) {
-		log.Println("authHandler")
-		p := page{Title: "Login", Body: template.HTML("<p>Login page</p>")}
-		renderTemplate(w, r, "login", &p)
-}
-*/
-
 func authHandler(m *model.Model) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("authHandler")
@@ -114,24 +154,61 @@ func authHandler(m *model.Model) http.HandlerFunc {
 			errorHandler(w, r, http.StatusBadRequest)
 			return
 		}
-		log.Println("authHandler->user-len: ")
-		log.Println(len(user))
-		p := page{Title: "Login", Body: template.HTML("<b>User not found!<b>")}
-		tmpl := "login"
-		if len(user) > 0 {
-			// создание и запись данных j пользователе в сессию/БД
-			//
-			people, err := m.People()
+		log.Println("authHandler->user: ")
+		log.Println(user)
+		if user != nil {
+			// создание и запись данных о пользователе в сессию/БД/cookie
+			token, err := createTokenJWT(user)
 			if err != nil {
-				errorHandler(w, r, http.StatusBadRequest)
+				log.Println("Error creating JWT token: ", err)
+				errorHandler(w, r, http.StatusInternalServerError)
 				return
 			}
-			p = page{Title: "people", Users: people}
-			tmpl = "people"
+			log.Println("JWT token: ", token)
+			// cookie
+			jwtCookie := &http.Cookie{}
+			jwtCookie.Name = "jwt"
+			jwtCookie.Value = token
+			jwtCookie.Path = "/"
+			jwtCookie.Expires = time.Now().Add(time.Hour * 12)
+			http.SetCookie(w, jwtCookie)
+			// redirect to URL
+			http.Redirect(w, r, "/people", 301)
 		}
-		renderTemplate(w, r, tmpl, &p)
+		p := page{Title: "Login", Body: template.HTML("<b>User not found!<b>")}
+		renderTemplate(w, r, "login", &p)
 
 	})
+}
+
+func createTokenJWT(m *model.User) (string, error) {
+	claims := ClaimsJWT{
+		"testName",
+		jwt.StandardClaims{
+			Id:        m.Login,                              //уникальный идентификатор токен (нужен, чтобы нельзя было «выпустить» токен второй раз)
+			ExpiresAt: time.Now().Add(time.Hour * 2).Unix(), //срок действия токена
+			/*
+				Audience  string `json:"aud,omitempty"`	 	имя клиента для которого токен выпущен.
+				ExpiresAt int64  `json:"exp,omitempty"`		срок действия токена.
+				Id        string `json:"jti,omitempty"`		уникальный идентификатор токен (нужен, чтобы нельзя был «выпустить» токен второй раз)
+				IssuedAt  int64  `json:"iat,omitempty"`		время выдачи токена.
+				Issuer    string `json:"iss,omitempty"` 	адрес или имя удостоверяющего центра.
+				NotBefore int64  `json:"nbf,omitempty"`		время, начиная с которого может быть использован (не раньше чем).
+				Subject   string `json:"sub,omitempty"`		идентификатор пользователя. Уникальный в рамках удостоверяющего центра, как минимум.
+			*/
+		},
+	}
+
+	/*token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	tokenEncodeString, err := token.SignedString([]byte("secret"))
+	*/
+
+	_, tokenEncodeString, err := tokenAuth.Encode(claims)
+
+	if err != nil {
+		return "", err
+	}
+	return tokenEncodeString, nil
 }
 
 func indexHandler(m *model.Model) http.Handler {
